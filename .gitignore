@@ -4,3 +4,4 @@ __pycache__/
 data/raw/*.csv
 .env
 node_modules/
+.claude/

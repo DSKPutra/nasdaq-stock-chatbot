@@ -63,7 +63,7 @@ function classifyIntent(text) {
 }
 
 const HELP_TEXT =
-  "Saya adalah chatbot analisis saham NASDAQ berbasis data mining. Anda bisa bertanya seperti:\n\n" +
+  "Saya adalah <b>NASDAQku.ID</b>, chatbot analisis saham NASDAQ berbasis data mining. Anda bisa bertanya seperti:\n\n" +
   "<b>Tren</b>: \"Bagaimana tren AAPL 30 hari terakhir?\"\n" +
   "<b>Prediksi arah harga</b>: \"Prediksi NVDA besok naik atau turun?\"\n" +
   "<b>Saham mirip</b>: \"Saham apa yang mirip dengan AMD?\"\n" +

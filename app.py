@@ -19,12 +19,17 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from src import chatbot, data_loader
 
-st.set_page_config(page_title="NASDAQ Stock Chatbot", page_icon="📈", layout="centered")
+_ICON = Path(__file__).resolve().parent / "webapp" / "assets" / "mark-256.jpeg"
+st.set_page_config(
+    page_title="NASDAQku.ID — Chatbot Analisis Saham NASDAQ",
+    page_icon=str(_ICON) if _ICON.exists() else None,
+    layout="centered",
+)
 
-st.title("📈 Chatbot Analisis Saham NASDAQ")
+st.title("NASDAQku.ID")
 st.caption(
-    "Chatbot berbasis data mining: klasifikasi arah harga, clustering saham, "
-    "dan deteksi anomali dari data OHLC harian 500 saham NASDAQ (1962-2026)."
+    "Chatbot analisis saham NASDAQ berbasis data mining: klasifikasi arah harga, "
+    "clustering saham, dan deteksi anomali dari data OHLC harian 500 saham NASDAQ (1962-2026)."
 )
 
 with st.sidebar:

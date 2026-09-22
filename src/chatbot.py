@@ -38,7 +38,7 @@ def _load_cluster_cache() -> pd.DataFrame:
 
 
 HELP_TEXT = (
-    "Saya adalah chatbot analisis saham NASDAQ berbasis data mining. "
+    "Saya adalah **NASDAQku.ID**, chatbot analisis saham NASDAQ berbasis data mining. "
     "Anda bisa bertanya seperti:\n\n"
     "- **Tren**: \"Bagaimana tren AAPL 6 bulan terakhir?\"\n"
     "- **Prediksi arah harga**: \"Prediksi NVDA besok naik atau turun?\"\n"

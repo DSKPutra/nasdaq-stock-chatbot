@@ -5,3 +5,5 @@ data/raw/*.csv
 .env
 node_modules/
 .claude/
+.netlify/
+.vercel/

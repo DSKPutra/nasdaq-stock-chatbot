@@ -13,7 +13,7 @@ from src import chatbot
 
 def main():
     print("=" * 60)
-    print(" Chatbot Analisis Saham NASDAQ (mode terminal)")
+    print(" NASDAQku.ID — Chatbot Analisis Saham NASDAQ (mode terminal)")
     print(" Ketik 'exit' atau 'keluar' untuk berhenti.")
     print("=" * 60)
     print(chatbot.HELP_TEXT)

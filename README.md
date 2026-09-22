@@ -1,9 +1,13 @@
-# Chatbot Analisis Saham NASDAQ (UTS Data Mining)
+# NASDAQku.ID — Chatbot Analisis Saham NASDAQ (UTS Data Mining)
 
 Chatbot yang menjawab pertanyaan seputar 500 saham NASDAQ memakai empat
 teknik data mining: feature engineering indikator teknikal, klasifikasi
 (prediksi arah harga), clustering (segmentasi saham), dan deteksi
 anomali. Data: harga OHLC harian per saham, 1962–2026, tanpa volume.
+
+**Demo web:** https://nasdaq-stock-chatbot-putratalks.vercel.app/ ·
+tampilan `webapp/` mengikuti Dea Saka Kurnia Putra Design System (lihat
+`webapp/style.css`).
 
 ## 1. Struktur Proyek
 

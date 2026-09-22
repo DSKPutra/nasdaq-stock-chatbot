@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>NASDAQ Stock Chatbot</title>
+<meta name="description" content="Chatbot analisis saham NASDAQ berbasis data mining: prediksi arah harga, clustering, dan deteksi anomali." />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <div class="logo">📈</div>
+    <div>
+      <h1>Chatbot Analisis Saham NASDAQ</h1>
+      <p>Klasifikasi arah harga &middot; clustering saham &middot; deteksi anomali &mdash; Data mining UTS</p>
+    </div>
+  </header>
+
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="stat">
+        <div class="n" id="stat-tickers">—</div>
+        <div class="l">saham NASDAQ tersedia</div>
+      </div>
+      <div class="stat">
+        <div class="n" id="stat-updated">—</div>
+        <div class="l">data terakhir dihitung</div>
+      </div>
+      <h2>Contoh ticker</h2>
+      <div id="ticker-chips"></div>
+    </aside>
+
+    <div class="chat-area">
+      <div class="messages" id="messages"></div>
+
+      <div class="composer">
+        <div class="suggestions">
+          <button data-q="Bagaimana tren AAPL 30 hari terakhir?">Tren AAPL</button>
+          <button data-q="Prediksi NVDA besok naik atau turun?">Prediksi NVDA</button>
+          <button data-q="Saham apa yang mirip dengan AMD?">Mirip AMD</button>
+          <button data-q="MSFT masuk cluster apa?">Cluster MSFT</button>
+          <button data-q="Kapan TSLA pernah anomali?">Anomali TSLA</button>
+        </div>
+        <form id="chat-form">
+          <input id="chat-input" type="text" placeholder="Tanyakan sesuatu, mis. 'Prediksi AAPL besok naik atau turun?'" autocomplete="off" />
+          <button type="submit">Kirim</button>
+        </form>
+        <div class="disclaimer">Hasil model data mining untuk tujuan edukasi — bukan saran investasi.</div>
+      </div>
+    </div>
+  </div>
+
+  <script src="chatbot.js"></script>
+  <script>
+    const messagesEl = document.getElementById("messages");
+
+    function addMessage(role, html) {
+      const div = document.createElement("div");
+      div.className = "msg " + role;
+      div.innerHTML = html;
+      messagesEl.appendChild(div);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    function escapeUser(text) {
+      const d = document.createElement("div");
+      d.innerText = text;
+      return d.innerHTML;
+    }
+
+    async function init() {
+      const res = await fetch("data.json");
+      const json = await res.json();
+      setData(json);
+
+      document.getElementById("stat-tickers").textContent = json.n_tickers;
+      document.getElementById("stat-updated").textContent = json.generated_at.split(" ")[0];
+
+      const chipsEl = document.getElementById("ticker-chips");
+      const sample = ["AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "AMD", "TSLA", "AVGO", "ADBE", "INTC"].filter(t => json.tickers.includes(t));
+      sample.forEach((t) => {
+        const chip = document.createElement("span");
+        chip.className = "chip";
+        chip.textContent = t;
+        chip.onclick = () => { document.getElementById("chat-input").value = `Bagaimana tren ${t}?`; };
+        chipsEl.appendChild(chip);
+      });
+
+      addMessage("bot", answer("help"));
+    }
+
+    document.getElementById("chat-form").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const input = document.getElementById("chat-input");
+      const text = input.value.trim();
+      if (!text) return;
+      addMessage("user", escapeUser(text));
+      input.value = "";
+      setTimeout(() => {
+        addMessage("bot", answer(text));
+      }, 150);
+    });
+
+    document.querySelectorAll(".suggestions button").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        document.getElementById("chat-input").value = btn.dataset.q;
+        document.getElementById("chat-form").requestSubmit();
+      });
+    });
+
+    init();
+  </script>
+</body>
+</html>

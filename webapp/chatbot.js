@@ -69,7 +69,8 @@ const HELP_TEXT =
   "<b>Saham mirip</b>: \"Saham apa yang mirip dengan AMD?\"\n" +
   "<b>Cluster</b>: \"AAPL masuk cluster apa?\"\n" +
   "<b>Anomali</b>: \"Kapan TSLA pernah mengalami pergerakan aneh?\"\n\n" +
-  "Sebutkan kode ticker NASDAQ (mis. AAPL, MSFT, NVDA) di pertanyaan Anda.";
+  "<i>Versi web ini adalah demo dengan " + (DATA ? DATA.n_tickers : 46) + " saham NASDAQ populer (AAPL, MSFT, NVDA, dst). " +
+  "Versi lengkap dengan 500 saham tersedia di source code (GitHub) dan versi Streamlit/VPS.</i>";
 
 const DISCLAIMER =
   "\n\n<i>Catatan: ini hasil model data mining untuk tujuan edukasi, bukan saran investasi.</i>";

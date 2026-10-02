@@ -118,6 +118,10 @@ def predict_next_direction(ticker: str) -> dict:
         "last_date": result["last_date"],
         "metrics": result["metrics"],
         "top_features": result["feature_importance"].head(5).to_dict(),
+        # nilai aktual tiap fitur pada baris terbaru -- dipakai untuk
+        # menjelaskan *mengapa* model condong ke arah tertentu, bukan
+        # cuma menyebut nama fiturnya (lihat src/explain.py).
+        "feature_values": {col: float(result["live_row"][col].iloc[0]) for col in FEATURE_COLS},
     }
 
 

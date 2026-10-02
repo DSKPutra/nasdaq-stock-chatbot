@@ -29,6 +29,7 @@ nasdaq_chatbot/
 │   ├── clustering.py         # segmentasi saham (K-Means)
 │   ├── anomaly.py            # deteksi anomali (Isolation Forest / Z-score)
 │   ├── nlu.py                 # deteksi intent + ekstraksi ticker dari teks
+│   ├── explain.py             # terjemahan angka -> kalimat yang mudah dipahami
 │   └── chatbot.py            # orchestrator: teks -> jawaban
 ├── app.py                    # antarmuka chatbot (Streamlit)
 ├── cli.py                    # antarmuka chatbot (terminal, tanpa Streamlit)
@@ -57,6 +58,12 @@ Contoh pertanyaan yang bisa diajukan ke chatbot:
 - "Saham apa yang mirip dengan AMD?"
 - "AAPL masuk cluster apa?"
 - "Kapan TSLA pernah anomali?"
+- "Ringkasan lengkap MSFT" — gabungan tren + prediksi + cluster + anomali dalam satu jawaban
+- "Bandingkan AAPL vs MSFT" — perbandingan dua saham sekaligus kesimpulan mana yang lebih kuat/tenang
+
+Setiap jawaban disertai **alasannya** dalam kalimat yang mudah dipahami
+(bukan cuma angka mentah) -- mis. bukan cuma "RSI 72.4", tapi "RSI 72.4
+-> zona jenuh beli, historisnya rawan koreksi turun". Lihat `src/explain.py`.
 
 ## 3. Metodologi (ringkasan untuk laporan)
 
@@ -110,13 +117,23 @@ clustering.
   COVID-19) dan 9 April 2025 — menunjukkan model berhasil menangkap
   peristiwa pasar yang memang secara faktual ekstrem.
 
-### 3.6 NLU & Chatbot (`src/nlu.py`, `src/chatbot.py`)
-Intent classification berbasis keyword matching (rule-based) untuk 6
-intent: trend, predict, similar, cluster, anomaly, help. Ekstraksi
-ticker dilakukan dua tahap untuk menghindari kata umum Bahasa
-Indonesia yang kebetulan sama dengan kode ticker asli (mis. "apa" vs
-ticker APA — Apa Corporation): diprioritaskan token yang ditulis
-kapital oleh pengguna, dengan daftar stopword sebagai pengaman.
+### 3.6 NLU & Chatbot (`src/nlu.py`, `src/chatbot.py`, `src/explain.py`)
+Intent classification berbasis keyword matching (rule-based) untuk 8
+intent: trend, predict, similar, cluster, anomaly, **overview**
+(ringkasan lengkap gabungan semua analisis), **compare** (bandingkan
+dua saham), dan help. Ekstraksi ticker dilakukan dua tahap untuk
+menghindari kata umum Bahasa Indonesia yang kebetulan sama dengan kode
+ticker asli (mis. "apa" vs ticker APA — Apa Corporation): diprioritaskan
+token yang ditulis kapital oleh pengguna, dengan daftar stopword
+sebagai pengaman. Intent `compare` memakai varian dua-ticker dari
+fungsi ekstraksi yang sama (`extract_tickers`).
+
+`src/explain.py` memisahkan logika "model" dari logika "bahasa":
+setiap angka (RSI, MACD, volatilitas, gap akurasi vs baseline, dst.)
+diterjemahkan jadi kalimat dengan ambang batas kualitatif eksplisit
+(mis. RSI ≥70 → jenuh beli, volatilitas tahunan ≥50% → tinggi), supaya
+jawaban chatbot menjelaskan *mengapa*, bukan cuma melaporkan angka.
+Modul ini murni (tanpa I/O) sehingga mudah diuji unit secara terpisah.
 
 ## 4. Keterbatasan & Pengembangan Lanjutan
 - Tidak ada data volume perdagangan -> tidak bisa menghitung indikator

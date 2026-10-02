@@ -231,6 +231,8 @@ header p {
 .msg.bot i, .msg.user i { color: var(--text-faint); }
 
 .msg ul { margin: var(--space-2) 0; padding-left: 18px; }
+.msg hr { border: none; border-top: var(--border-hairline) solid var(--line-hairline); margin: var(--space-3) 0; }
+.msg.user hr { border-top-color: var(--line-inverse); }
 
 .up { color: var(--status-positive); font-weight: 600; font-family: var(--font-mono); }
 .down { color: var(--status-critical); font-weight: 600; font-family: var(--font-mono); }

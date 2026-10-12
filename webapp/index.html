@@ -6,7 +6,7 @@
 <title>NASDAQku.ID — Chatbot Analisis Saham NASDAQ</title>
 <meta name="description" content="NASDAQku.ID — chatbot analisis saham NASDAQ berbasis data mining: prediksi arah harga, clustering, dan deteksi anomali." />
 <link rel="icon" type="image/png" href="assets/favicon.png" />
-<link rel="stylesheet" href="style.css?v=20261012" />
+<link rel="stylesheet" href="style.css?v=20261012b" />
 </head>
 <body>
   <header>
@@ -61,8 +61,8 @@
     </div>
   </footer>
 
-  <script src="charts.js?v=20261012"></script>
-  <script src="chatbot.js?v=20261012"></script>
+  <script src="charts.js?v=20261012b"></script>
+  <script src="chatbot.js?v=20261012b"></script>
   <script>
     const messagesEl = document.getElementById("messages");
 
@@ -108,6 +108,10 @@
       if (!text) return;
       addMessage("user", escapeUser(text));
       input.value = "";
+      if (!DATA) {
+        addMessage("bot", "Data saham masih dimuat. Coba kirim lagi sebentar lagi.");
+        return;
+      }
       setTimeout(() => {
         addMessage("bot", answer(text));
       }, 150);

@@ -30,6 +30,7 @@ nasdaq_chatbot/
 │   ├── anomaly.py            # deteksi anomali (Isolation Forest / Z-score)
 │   ├── nlu.py                 # deteksi intent + ekstraksi ticker dari teks
 │   ├── explain.py             # terjemahan angka -> kalimat yang mudah dipahami
+│   ├── charts.py              # spesifikasi + renderer chart (matplotlib) untuk jawaban
 │   └── chatbot.py            # orchestrator: teks -> jawaban
 ├── app.py                    # antarmuka chatbot (Streamlit)
 ├── cli.py                    # antarmuka chatbot (terminal, tanpa Streamlit)
@@ -60,6 +61,15 @@ Contoh pertanyaan yang bisa diajukan ke chatbot:
 - "Kapan TSLA pernah anomali?"
 - "Ringkasan lengkap MSFT" — gabungan tren + prediksi + cluster + anomali dalam satu jawaban
 - "Bandingkan AAPL vs MSFT" — perbandingan dua saham sekaligus kesimpulan mana yang lebih kuat/tenang
+
+Jawaban juga disertai **chart** bila relevan: garis harga + SMA10/SMA50
+(tren), gauge peluang naik/turun dan batang akurasi vs baseline
+(prediksi), volatilitas per cluster, return pada hari anomali, serta
+perbandingan dua saham (garis kinerja relatif + batang). Versi Streamlit
+merender chart lewat matplotlib (`src/charts.py`); versi web statis
+merendernya sebagai HTML/CSS (`webapp/charts.js`) dari spesifikasi yang
+sama, tanpa grafik garis harga karena `data.json` tidak menyimpan deret
+harga.
 
 Setiap jawaban disertai **alasannya** dalam kalimat yang mudah dipahami
 (bukan cuma angka mentah) -- mis. bukan cuma "RSI 72.4", tapi "RSI 72.4
@@ -145,3 +155,14 @@ Modul ini murni (tanpa I/O) sehingga mudah diuji unit secara terpisah.
 - Bisa ditambahkan: perbandingan beberapa model klasifikasi (Logistic
   Regression, XGBoost) dan evaluasi hyperparameter tuning untuk
   memperkaya analisis di laporan.
+
+## 5. Hak Cipta
+
+© 2026 **Dea Saka Kurnia Putra**. Seluruh hak cipta dilindungi.
+
+NASDAQku.ID dirancang dan dikembangkan oleh Dea Saka Kurnia Putra,
+termasuk identitas visual (logo monogram P dan lockup "Dea Saka Kurnia
+Putra — A brighter tomorrow through meaningful work") yang merupakan
+merek personal pemiliknya. Kode dan aset dalam repositori ini tidak
+boleh digunakan ulang atau didistribusikan ulang tanpa izin tertulis
+dari pemilik hak cipta.

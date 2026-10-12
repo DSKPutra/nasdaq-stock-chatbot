@@ -15,6 +15,7 @@ def main():
     print("=" * 60)
     print(" NASDAQku.ID — Chatbot Analisis Saham NASDAQ (mode terminal)")
     print(" Ketik 'exit' atau 'keluar' untuk berhenti.")
+    print(" (c) 2026 Dea Saka Kurnia Putra. Seluruh hak cipta dilindungi.")
     print("=" * 60)
     print(chatbot.HELP_TEXT)
     print()

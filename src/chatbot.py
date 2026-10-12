@@ -17,11 +17,12 @@ setiap kali chatbot dijalankan -- lihat scripts/build_cluster_cache.py.
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import pandas as pd
 
-from . import anomaly, classification, clustering, data_loader, explain, features, nlu
+from . import anomaly, charts, classification, clustering, data_loader, explain, features, nlu
 
 CACHE_PATH = Path(__file__).resolve().parent.parent / "data" / "processed" / "cluster_summary.csv"
 
@@ -57,25 +58,40 @@ HELP_TEXT = (
 DISCLAIMER = "\n\n_Catatan: ini hasil model data mining untuk tujuan edukasi, bukan saran investasi._"
 
 
+@dataclass
+class Reply:
+    """Jawaban chatbot: teks (markdown) + daftar spesifikasi chart
+    (lihat src/charts.py). CLI cukup memakai `.text`; Streamlit juga
+    merender `.charts`."""
+
+    text: str
+    charts: list = field(default_factory=list)
+
+
 def answer(text: str) -> str:
+    """Hanya teksnya (untuk CLI / pemakaian sederhana)."""
+    return answer_rich(text).text
+
+
+def answer_rich(text: str) -> Reply:
     parsed = nlu.parse(text)
 
     if parsed.intent == "help" or (parsed.intent == "unknown" and parsed.ticker is None):
-        return HELP_TEXT
+        return Reply(HELP_TEXT)
 
     if parsed.intent == "compare":
         if not parsed.ticker or not parsed.ticker2:
-            return (
+            return Reply(
                 "Untuk membandingkan, sebutkan dua kode ticker NASDAQ, misalnya "
                 "\"Bandingkan AAPL vs MSFT\"."
             )
         try:
             return _answer_compare(parsed.ticker, parsed.ticker2)
         except Exception as e:
-            return f"Maaf, terjadi kendala saat membandingkan {parsed.ticker} dan {parsed.ticker2}: {e}"
+            return Reply(f"Maaf, terjadi kendala saat membandingkan {parsed.ticker} dan {parsed.ticker2}: {e}")
 
     if parsed.ticker is None:
-        return (
+        return Reply(
             "Saya belum menangkap kode ticker-nya. Coba sebutkan kode saham NASDAQ "
             "secara eksplisit, misalnya AAPL, MSFT, atau NVDA."
         )
@@ -96,10 +112,10 @@ def answer(text: str) -> str:
         else:
             return _answer_trend(parsed.ticker)  # fallback wajar
     except Exception as e:
-        return f"Maaf, terjadi kendala saat memproses permintaan untuk {parsed.ticker}: {e}"
+        return Reply(f"Maaf, terjadi kendala saat memproses permintaan untuk {parsed.ticker}: {e}")
 
 
-def _answer_trend(ticker: str) -> str:
+def _answer_trend(ticker: str) -> Reply:
     df = data_loader.load_ticker(ticker)
     df_ind = features.add_technical_indicators(df)
     last = df_ind.tail(1).iloc[0]
@@ -121,15 +137,16 @@ def _answer_trend(ticker: str) -> str:
         signal_lines.append(f"- {explain.interpret_volatility(last['volatility_20'])}")
     signal_block = "\n".join(signal_lines) if signal_lines else "- (indikator belum cukup data historis)"
 
-    return (
+    text = (
         f"**{ticker}** ditutup di **${last['close']:.2f}** pada {last['date'].date()}.\n\n"
         f"Dalam 30 hari terakhir harganya {narasi_30d}; dalam ~1 tahun terakhir berubah {change_1y:+.2f}%.\n"
         f"Rentang harga hari terakhir (high-low): ${last['high']:.2f} - ${last['low']:.2f}\n\n"
         f"**Sinyal teknikal saat ini:**\n{signal_block}"
     )
+    return Reply(text, charts.trend_charts(df_ind, change_30d, change_1y))
 
 
-def _answer_predict(ticker: str) -> str:
+def _answer_predict(ticker: str) -> Reply:
     result = classification.predict_next_direction(ticker)
     m = result["metrics"]
     fv = result["feature_values"]
@@ -150,7 +167,7 @@ def _answer_predict(ticker: str) -> str:
 
     confidence_note = explain.interpret_confidence_gap(m["accuracy"], m["baseline_naive_up_rate"])
 
-    return (
+    text = (
         f"Prediksi arah harga **{result['ticker']}** untuk hari berikutnya: "
         f"**{result['direction']}** (probabilitas naik = {result['probability_up']*100:.1f}%).\n\n"
         f"Harga penutupan terakhir: ${result['last_close']:.2f} pada {result['last_date']}.\n\n"
@@ -165,13 +182,14 @@ def _answer_predict(ticker: str) -> str:
         f"F1 {m['f1']*100:.1f}%"
         + DISCLAIMER
     )
+    return Reply(text, charts.prediction_charts(result["direction"], result["probability_up"], m))
 
 
-def _answer_similar(ticker: str) -> str:
+def _answer_similar(ticker: str) -> Reply:
     cache = _load_cluster_cache()
     sims = clustering.similar_stocks(ticker, cache, top_n=5)
     if sims.empty:
-        return f"Tidak ditemukan saham lain yang mirip dengan {ticker} pada cluster yang sama."
+        return Reply(f"Tidak ditemukan saham lain yang mirip dengan {ticker} pada cluster yang sama.")
 
     target = cache.loc[ticker.upper()]
     lines = [
@@ -186,14 +204,14 @@ def _answer_similar(ticker: str) -> str:
             f"volatilitas tahunan {row['volatility_annualized']*100:.1f}% "
             f"({abs(vol_delta_pp):.1f} poin % {lebih} dari {ticker}), CAGR 3th {row['cagr_3y']*100:.1f}%"
         )
-    return "\n".join(lines)
+    return Reply("\n".join(lines), [charts.similar_chart(ticker.upper(), float(target["volatility_annualized"]), sims)])
 
 
-def _answer_cluster(ticker: str) -> str:
+def _answer_cluster(ticker: str) -> Reply:
     cache = _load_cluster_cache()
     ticker = ticker.upper()
     if ticker not in cache.index:
-        return f"Ticker {ticker} tidak ada pada tabel cluster."
+        return Reply(f"Ticker {ticker} tidak ada pada tabel cluster.")
     cluster_id = int(cache.loc[ticker, "cluster"])
     profile = clustering.cluster_profile(cache, cluster_id)
     members = cache[cache["cluster"] == cluster_id].index.tolist()
@@ -207,7 +225,7 @@ def _answer_cluster(ticker: str) -> str:
     vol_vs_cluster = "lebih tinggi" if row["volatility_annualized"] > profile["volatility_annualized"] else "lebih rendah"
     ret_vs_cluster = "lebih tinggi" if row["mean_daily_return"] > profile["mean_daily_return"] else "lebih rendah"
 
-    return (
+    text = (
         f"**{ticker}** berada di **cluster #{cluster_id}** (berisi {len(members)} saham).\n\n"
         f"**Karakter cluster ini:** {archetype}\n\n"
         f"Profil rata-rata cluster:\n"
@@ -219,16 +237,17 @@ def _answer_cluster(ticker: str) -> str:
         f"return harian rata-ratanya **{ret_vs_cluster}**.\n\n"
         f"Contoh anggota cluster: {sample_members}{'...' if len(members) > 15 else ''}"
     )
+    return Reply(text, [charts.cluster_chart(cache, cluster_id, ticker)])
 
 
-def _answer_anomaly(ticker: str) -> str:
+def _answer_anomaly(ticker: str) -> Reply:
     df = data_loader.load_ticker(ticker)
     df_ind = features.add_technical_indicators(df)
     typical_daily_pct = float(df_ind["return_1d"].dropna().std() * 100)
 
     anomalies = anomaly.detect_anomalies(ticker, method="isolation_forest", top_n=5)
     if anomalies.empty:
-        return f"Tidak ditemukan hari dengan pergerakan anomali yang signifikan untuk {ticker}."
+        return Reply(f"Tidak ditemukan hari dengan pergerakan anomali yang signifikan untuk {ticker}.")
 
     lines = [
         f"Hari-hari dengan pergerakan harga tidak wajar pada **{ticker}** (deteksi Isolation "
@@ -240,47 +259,45 @@ def _answer_anomaly(ticker: str) -> str:
             f"- {row['date'].date()}: return {row['return_1d']*100:+.2f}%, "
             f"close ${row['close']:.2f}, rentang harian {row['hl_range_pct']*100:.2f}% -- {severity}"
         )
-    return "\n".join(lines)
+    return Reply("\n".join(lines), [charts.anomaly_chart(anomalies, ticker)])
 
 
-def _answer_overview(ticker: str) -> str:
+def _answer_overview(ticker: str) -> Reply:
     """Ringkasan lengkap: gabungan tren, prediksi, cluster, dan jumlah
     anomali untuk satu saham dalam satu jawaban naratif -- cocok untuk
     pertanyaan terbuka semacam "ceritakan semua tentang AAPL"."""
     ticker = ticker.upper()
-    sections = [f"## Ringkasan lengkap {ticker}"]
+    parts: list[Reply] = []
 
-    try:
-        sections.append(_answer_trend(ticker))
-    except Exception as e:
-        sections.append(f"_Tren tidak tersedia: {e}_")
-
-    try:
-        sections.append(_answer_predict(ticker))
-    except Exception as e:
-        sections.append(f"_Prediksi arah harga tidak tersedia: {e}_")
-
-    try:
-        sections.append(_answer_cluster(ticker))
-    except Exception as e:
-        sections.append(f"_Info cluster tidak tersedia: {e}_")
+    for label, fn in (
+        ("Tren", _answer_trend),
+        ("Prediksi arah harga", _answer_predict),
+        ("Info cluster", _answer_cluster),
+    ):
+        try:
+            parts.append(fn(ticker))
+        except Exception as e:
+            parts.append(Reply(f"_{label} tidak tersedia: {e}_"))
 
     try:
         anomalies = anomaly.detect_anomalies(ticker, method="isolation_forest", top_n=50)
         if anomalies.empty:
-            sections.append(f"Tidak ada anomali besar yang tercatat untuk {ticker}.")
+            parts.append(Reply(f"Tidak ada anomali besar yang tercatat untuk {ticker}."))
         else:
-            sections.append(
-                f"Tercatat **{len(anomalies)} hari** dengan pergerakan anomali signifikan "
-                f"sepanjang riwayat {ticker}. Tanya \"anomali {ticker}\" untuk rinciannya."
+            parts.append(
+                Reply(
+                    f"Tercatat **{len(anomalies)} hari** dengan pergerakan anomali signifikan "
+                    f"sepanjang riwayat {ticker}. Tanya \"anomali {ticker}\" untuk rinciannya."
+                )
             )
     except Exception as e:
-        sections.append(f"_Info anomali tidak tersedia: {e}_")
+        parts.append(Reply(f"_Info anomali tidak tersedia: {e}_"))
 
-    return "\n\n---\n\n".join(sections)
+    text = f"## Ringkasan lengkap {ticker}\n\n" + "\n\n---\n\n".join(p.text for p in parts)
+    return Reply(text, [c for p in parts for c in p.charts])
 
 
-def _answer_compare(t1: str, t2: str) -> str:
+def _answer_compare(t1: str, t2: str) -> Reply:
     """Membandingkan dua saham: harga & momentum 30 hari, volatilitas,
     dan keanggotaan cluster -- dengan kesimpulan eksplisit mana yang
     lebih kuat/lebih tenang, bukan cuma angka berdampingan."""
@@ -288,14 +305,14 @@ def _answer_compare(t1: str, t2: str) -> str:
     df1 = data_loader.load_ticker(t1)
     df2 = data_loader.load_ticker(t2)
 
-    def snapshot(df: pd.DataFrame) -> tuple[pd.Series, float]:
+    def snapshot(df: pd.DataFrame) -> tuple[pd.Series, float, float]:
         last = df.tail(1).iloc[0]
         prev_30 = df.tail(31).iloc[0] if len(df) > 31 else df.iloc[0]
-        change_30d = (last["close"] / prev_30["close"] - 1) * 100
-        return last, change_30d
+        prev_252 = df.tail(253).iloc[0] if len(df) > 253 else df.iloc[0]
+        return last, (last["close"] / prev_30["close"] - 1) * 100, (last["close"] / prev_252["close"] - 1) * 100
 
-    last1, chg1 = snapshot(df1)
-    last2, chg2 = snapshot(df2)
+    last1, chg1, yr1 = snapshot(df1)
+    last2, chg2, yr2 = snapshot(df2)
 
     lines = [f"**Perbandingan {t1} vs {t2}:**\n"]
     lines.append(f"- Harga terakhir: {t1} ${last1['close']:.2f} vs {t2} ${last2['close']:.2f}")
@@ -303,9 +320,10 @@ def _answer_compare(t1: str, t2: str) -> str:
     stronger = t1 if chg1 > chg2 else t2
     lines.append(f"  -> momentum 30 hari terakhir lebih kuat pada **{stronger}**")
 
+    vol1 = vol2 = None
     cache = _load_cluster_cache()
     if t1 in cache.index and t2 in cache.index:
-        vol1, vol2 = cache.loc[t1, "volatility_annualized"], cache.loc[t2, "volatility_annualized"]
+        vol1, vol2 = float(cache.loc[t1, "volatility_annualized"]), float(cache.loc[t2, "volatility_annualized"])
         lines.append(f"- Volatilitas tahunan: {t1} {vol1*100:.1f}% vs {t2} {vol2*100:.1f}%")
         calmer = t1 if vol1 < vol2 else t2
         lines.append(f"  -> **{calmer}** secara historis lebih tenang (risiko pergerakan harian lebih kecil)")
@@ -319,7 +337,7 @@ def _answer_compare(t1: str, t2: str) -> str:
         missing = t1 if t1 not in cache.index else t2
         lines.append(f"_(Data cluster untuk {missing} tidak tersedia, sebagian perbandingan dilewati.)_")
 
-    return "\n".join(lines) + DISCLAIMER
+    return Reply("\n".join(lines) + DISCLAIMER, charts.compare_charts(t1, t2, df1, df2, chg1, chg2, yr1, yr2, vol1, vol2))
 
 
 if __name__ == "__main__":

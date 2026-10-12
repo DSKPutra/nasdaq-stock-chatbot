@@ -208,6 +208,14 @@ def interpret_anomaly_severity(return_pct: float, typical_move_pct: float | None
     a = abs(return_pct)
     if typical_move_pct and typical_move_pct > 0:
         multiple = a / typical_move_pct
+        if multiple < 1.5:
+            # Isolation Forest menilai beberapa fitur sekaligus (return, rentang
+            # harian, volatilitas), jadi hari ini bisa ditandai walau return-nya
+            # sendiri biasa saja -- jangan dibilang "x kali lebih besar".
+            return (
+                "return hari itu sendiri tergolong biasa; ditandai karena kombinasi rentang "
+                "harian/volatilitas yang tidak lazim"
+            )
         tag = "ekstrem" if multiple >= 4 else "signifikan" if multiple >= 2.5 else "cukup besar"
         return f"{tag} -- sekitar {multiple:.1f}x lebih besar dari pergerakan harian normal saham ini"
     tag = "ekstrem" if a >= 15 else "signifikan" if a >= 8 else "cukup besar"

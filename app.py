@@ -17,7 +17,9 @@ import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from src import chatbot, data_loader
+import matplotlib.pyplot as plt
+
+from src import charts, chatbot, data_loader
 
 _ICON = Path(__file__).resolve().parent / "webapp" / "assets" / "mark-256.jpeg"
 st.set_page_config(
@@ -56,9 +58,20 @@ if "messages" not in st.session_state:
         {"role": "assistant", "content": chatbot.HELP_TEXT}
     ]
 
+
+
+def show_charts(specs):
+    for spec in specs:
+        fig = charts.render(spec)
+        st.pyplot(fig, clear_figure=True)
+        plt.close(fig)
+        st.caption(spec["caption"])
+
+
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
+        show_charts(msg.get("charts", []))
 
 if prompt := st.chat_input("Tanyakan sesuatu, mis. 'Prediksi AAPL besok naik atau turun?'"):
     st.session_state.messages.append({"role": "user", "content": prompt})
@@ -67,6 +80,19 @@ if prompt := st.chat_input("Tanyakan sesuatu, mis. 'Prediksi AAPL besok naik ata
 
     with st.chat_message("assistant"):
         with st.spinner("Menganalisis..."):
-            reply = chatbot.answer(prompt)
-        st.markdown(reply)
-    st.session_state.messages.append({"role": "assistant", "content": reply})
+            reply = chatbot.answer_rich(prompt)
+        st.markdown(reply.text)
+        show_charts(reply.charts)
+    st.session_state.messages.append({"role": "assistant", "content": reply.text, "charts": reply.charts})
+
+st.divider()
+_logo = Path(__file__).resolve().parent / "webapp" / "assets" / "logo-horizontal.jpeg"
+_c1, _c2 = st.columns([1, 2], vertical_alignment="center")
+with _c1:
+    if _logo.exists():
+        st.image(str(_logo))
+with _c2:
+    st.caption(
+        "© 2026 Dea Saka Kurnia Putra. Seluruh hak cipta dilindungi.  \n"
+        "NASDAQku.ID dirancang dan dikembangkan oleh **Dea Saka Kurnia Putra**."
+    )

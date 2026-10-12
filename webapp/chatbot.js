@@ -180,6 +180,9 @@ function interpretAnomalySeverity(returnPct, typicalMovePct) {
   const a = Math.abs(returnPct);
   if (typicalMovePct && typicalMovePct > 0) {
     const multiple = a / typicalMovePct;
+    if (multiple < 1.5) {
+      return "return hari itu sendiri tergolong biasa; ditandai karena kombinasi rentang harian/volatilitas yang tidak lazim";
+    }
     const tag = multiple >= 4 ? "ekstrem" : multiple >= 2.5 ? "signifikan" : "cukup besar";
     return `${tag} -- sekitar ${multiple.toFixed(1)}x lebih besar dari perkiraan pergerakan harian normal kelompok saham ini`;
   }
@@ -214,6 +217,21 @@ function interpretFeatureName(name) {
   return FEATURE_EXPLANATION[name] || null;
 }
 
+function toneOf(v) {
+  return v >= 0 ? "pos" : "neg";
+}
+
+function priceChangeChart(t) {
+  return renderChart({
+    kind: "bars", title: "Perubahan harga", signed: true, cap: 150, unit: "%",
+    caption: "Hijau = naik, merah = turun. Makin panjang batang, makin besar perubahannya.",
+    items: [
+      { label: "30 hari", value: t.change_30d_pct, tone: toneOf(t.change_30d_pct) },
+      { label: "~1 tahun", value: t.change_1y_pct, tone: toneOf(t.change_1y_pct) },
+    ],
+  });
+}
+
 function answerTrend(ticker) {
   const s = DATA.stocks[ticker];
   if (!s) return `Data untuk ${ticker} tidak ditemukan.`;
@@ -223,7 +241,8 @@ function answerTrend(ticker) {
     `<b>${ticker}</b> ditutup di <b>$${t.last_close.toFixed(2)}</b> pada ${t.last_date}.\n\n` +
     `Dalam 30 hari terakhir harganya ${narasi30d}; dalam ~1 tahun terakhir berubah ${fmtPct(t.change_1y_pct)}.\n` +
     `Rentang harga hari terakhir (high-low): $${t.last_high.toFixed(2)} - $${t.last_low.toFixed(2)}\n\n` +
-    `<i>Sinyal teknikal harian (RSI/MACD/SMA) hanya tersedia di versi lengkap (Python/Streamlit) -- lihat juga cluster &amp; prediksi di bawah untuk gambaran arah momentum.</i>`
+    `<i>Sinyal teknikal harian (RSI/MACD/SMA) hanya tersedia di versi lengkap (Python/Streamlit) -- lihat juga cluster &amp; prediksi di bawah untuk gambaran arah momentum.</i>` +
+    priceChangeChart(t)
   );
 }
 
@@ -250,15 +269,35 @@ function answerPredict(ticker) {
   const reasoningBlock = reasons.length ? `<ul>${reasons.join("")}</ul>` : "(indikator pendukung tidak tersedia)";
   const confidenceNote = interpretConfidenceGap(p.accuracy, p.baseline_naive_up_rate);
 
+  const probChart = renderChart({
+    kind: "prob", title: "Probabilitas arah harga besok", p_up: p.probability_up,
+    caption: "Batang dibagi dua: bagian hijau = peluang naik, merah = peluang turun. Garis tengah = 50%.",
+  });
+  const acc = p.accuracy * 100, base = p.baseline_naive_up_rate * 100;
+  const metricsChart = renderChart({
+    kind: "bars", title: "Seberapa andal model ini?", unit: "%", domain: [0, 100],
+    guide: { value: Number(base.toFixed(1)), label: "baseline" },
+    caption: "Garis putus-putus = baseline (tebakan 'selalu naik'). " + (acc > base
+      ? "Akurasi model melewati garis baseline, artinya model lebih baik dari tebakan naif."
+      : "Akurasi model tidak melewati garis baseline, artinya model tidak lebih baik dari tebakan naif."),
+    items: [
+      { label: "Akurasi model", value: Number(acc.toFixed(1)), tone: "ink" },
+      { label: "Baseline (selalu naik)", value: Number(base.toFixed(1)), tone: "muted" },
+      { label: "Precision", value: Number((p.precision * 100).toFixed(1)), tone: "mid" },
+      { label: "Recall", value: Number((p.recall * 100).toFixed(1)), tone: "mid" },
+      { label: "F1", value: Number((p.f1 * 100).toFixed(1)), tone: "mid" },
+    ],
+  });
+
   return (
     `Prediksi arah harga <b>${ticker}</b> untuk hari berikutnya: ` +
     `<span class="${arahClass}"><b>${p.direction}</b></span> (probabilitas naik = ${(p.probability_up * 100).toFixed(1)}%).\n\n` +
-    `Harga penutupan terakhir: $${s.trend.last_close.toFixed(2)} pada ${s.trend.last_date}.\n\n` +
+    `Harga penutupan terakhir: $${s.trend.last_close.toFixed(2)} pada ${s.trend.last_date}.` + probChart +
     `<b>Mengapa model condong ke arah ini</b> (indikator paling berpengaruh pada model):\n${reasoningBlock}\n` +
     `<b>Seberapa bisa diandalkan prediksi ini?</b>\n` +
     `- Diuji pada ${p.n_test} hari terakhir (${p.test_period_start} s/d ${p.test_period_end})\n` +
     `- Akurasi ${(p.accuracy * 100).toFixed(1)}% vs baseline 'selalu tebak naik' ${(p.baseline_naive_up_rate * 100).toFixed(1)}% -> ${confidenceNote}\n` +
-    `- Precision ${(p.precision * 100).toFixed(1)}% (dari semua prediksi 'naik', berapa % yang benar), Recall ${(p.recall * 100).toFixed(1)}% (dari semua hari yang benar-benar naik, berapa % tertangkap model), F1 ${(p.f1 * 100).toFixed(1)}%` +
+    `- Precision ${(p.precision * 100).toFixed(1)}% (dari semua prediksi 'naik', berapa % yang benar), Recall ${(p.recall * 100).toFixed(1)}% (dari semua hari yang benar-benar naik, berapa % tertangkap model), F1 ${(p.f1 * 100).toFixed(1)}%` + metricsChart +
     DISCLAIMER
   );
 }
@@ -277,6 +316,17 @@ function answerSimilar(ticker) {
     out += `<li><b>${simTicker}</b>` + (simTrend ? ` — close terakhir $${simTrend.last_close.toFixed(2)}` : "") + `</li>`;
   }
   out += "</ul>";
+  const items = [{ label: `${ticker} (acuan)`, value: s.trend.change_30d_pct, tone: toneOf(s.trend.change_30d_pct) }];
+  for (const t of s.similar) {
+    if (DATA.stocks[t]) items.push({ label: t, value: DATA.stocks[t].trend.change_30d_pct, tone: toneOf(DATA.stocks[t].trend.change_30d_pct) });
+  }
+  if (items.length >= 2) {
+    out += renderChart({
+      kind: "bars", title: `Perubahan harga 30 hari: ${ticker} vs saham mirip`, signed: true, cap: 150, unit: "%",
+      caption: "Hanya saham mirip yang ada di dataset demo ini yang ditampilkan. Saham sekelompok sering bergerak searah, tapi tidak selalu.",
+      items,
+    });
+  }
   return out;
 }
 
@@ -294,7 +344,16 @@ function answerCluster(ticker) {
     `- Volatilitas tahunan: ${(profile.volatility_annualized * 100).toFixed(1)}%\n` +
     `- RSI rata-rata: ${profile.avg_rsi.toFixed(1)}\n` +
     `- Max drawdown rata-rata: ${(profile.max_drawdown * 100).toFixed(1)}%\n\n` +
-    `Contoh anggota cluster: ${members}${profile.n_members > 15 ? "..." : ""}`
+    `Contoh anggota cluster: ${members}${profile.n_members > 15 ? "..." : ""}` +
+    renderChart({
+      kind: "bars", title: "Volatilitas tahunan rata-rata per cluster", unit: "%", cap: 150,
+      caption: `Batang gelap = cluster ${ticker}. Angka dalam kurung = jumlah saham di cluster itu. Makin panjang batang, makin liar pergerakan harga rata-rata sahamnya.`,
+      items: Object.keys(DATA.cluster_profiles).sort((a, b) => a - b).map((id) => ({
+        label: `Cluster #${id} (${DATA.cluster_profiles[id].n_members})`,
+        value: Number((DATA.cluster_profiles[id].volatility_annualized * 100).toFixed(1)),
+        tone: Number(id) === s.cluster ? "ink" : "muted",
+      })),
+    })
   );
 }
 
@@ -318,6 +377,14 @@ function answerAnomaly(ticker) {
     out += `<li>${a.date}: <span class="${cls}">${fmtPct(a.return_pct)}</span>, close $${a.close.toFixed(2)} -- ${severity}</li>`;
   }
   out += "</ul>";
+  const extreme = s.anomalies.some((a) => Math.abs(a.return_pct) > 100);
+  out += renderChart({
+    kind: "bars", title: `Return harian pada hari-hari anomali ${ticker}`, signed: true, cap: 100, unit: "%",
+    caption: "Hijau = hari naik, merah = hari turun." + (extreme
+      ? " Lonjakan ratusan persen yang langsung disusul pembalikan sering berasal dari penyesuaian split pada data, bukan pergerakan pasar nyata."
+      : ""),
+    items: s.anomalies.map((a) => ({ label: a.date, value: a.return_pct, tone: toneOf(a.return_pct) })),
+  });
   return out;
 }
 
@@ -368,7 +435,31 @@ function answerCompare(t1, t2) {
     }
   }
   lines.push("</ul>");
-  return lines.join("\n") + DISCLAIMER;
+  const series = [{ label: t1, tone: "ink" }, { label: t2, tone: "mid" }];
+  const changeChart = renderChart({
+    kind: "grouped", title: "Perubahan harga", signed: true, cap: 150, unit: "%", series,
+    caption: "Batang atas = " + t1 + ", batang bawah = " + t2 + " pada tiap baris. Ke kanan = naik, ke kiri = turun.",
+    items: [
+      { label: "30 hari", values: [s1.trend.change_30d_pct, s2.trend.change_30d_pct] },
+      { label: "~1 tahun", values: [s1.trend.change_1y_pct, s2.trend.change_1y_pct] },
+    ],
+  });
+  const modelItems = [];
+  if (s1.prediction && s2.prediction) {
+    modelItems.push({ label: "Peluang naik", values: [s1.prediction.probability_up * 100, s2.prediction.probability_up * 100].map((v) => Number(v.toFixed(1))) });
+    modelItems.push({ label: "Akurasi model", values: [s1.prediction.accuracy * 100, s2.prediction.accuracy * 100].map((v) => Number(v.toFixed(1))) });
+  }
+  if (p1 && p2) {
+    modelItems.push({ label: "Volatilitas kelompok", values: [p1.volatility_annualized * 100, p2.volatility_annualized * 100].map((v) => Number(v.toFixed(1))) });
+  }
+  const modelChart = modelItems.length
+    ? renderChart({
+        kind: "grouped", title: "Model dan risiko", unit: "%", cap: 100, series,
+        caption: "Peluang naik & akurasi berasal dari model Random Forest; volatilitas adalah rata-rata kelompok (cluster) tiap saham. Makin panjang batang volatilitas, makin liar pergerakan harganya.",
+        items: modelItems,
+      })
+    : "";
+  return lines.join("\n") + changeChart + modelChart + DISCLAIMER;
 }
 
 function answer(text) {
